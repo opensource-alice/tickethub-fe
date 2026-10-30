@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Filter, X, RotateCcw, Check } from 'lucide-react';
 
 import { useQuery } from '@tanstack/react-query';
-import { api } from '@/lib/api-client';
+import { getClassifications } from '@/api/classifications';
 
 const POPULAR_CITIES = [
   'All Cities',
@@ -57,7 +57,7 @@ export function EventFilters() {
 
   const { data: classificationsData } = useQuery({
     queryKey: ['classifications'],
-    queryFn: () => api.getClassifications(),
+    queryFn: () => getClassifications(),
     staleTime: 10 * 60 * 1000,
   });
 

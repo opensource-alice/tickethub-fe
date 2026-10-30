@@ -4,7 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useQuery } from '@tanstack/react-query';
 import { Music2, Trophy, Theater, Film, Sparkles, ArrowRight } from 'lucide-react';
-import { api } from '@/lib/api-client';
+import { getClassifications } from '@/api/classifications';
 
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   Music2,
@@ -25,7 +25,7 @@ const GRADIENTS: Record<string, string> = {
 export function CategoryTiles() {
   const { data, isLoading } = useQuery({
     queryKey: ['classifications'],
-    queryFn: () => api.getClassifications(),
+    queryFn: () => getClassifications(),
     staleTime: 10 * 60 * 1000,
   });
 

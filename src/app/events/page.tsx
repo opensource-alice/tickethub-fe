@@ -13,7 +13,7 @@ import {
   Frown,
   X,
 } from 'lucide-react';
-import { api } from '@/lib/api-client';
+import { getEvents } from '@/api/events';
 import { EventFilters } from '@/components/events/event-filters';
 import { EventCard } from '@/components/events/event-card';
 import { EventListItem } from '@/components/events/event-list-item';
@@ -36,7 +36,7 @@ function EventsContent() {
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['events', { keyword, city, countryCode, classificationName, startDateTime, endDateTime, page, size, sort }],
     queryFn: () =>
-      api.getEvents({
+      getEvents({
         keyword,
         city,
         countryCode,

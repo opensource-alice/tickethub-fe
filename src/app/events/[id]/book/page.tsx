@@ -1,6 +1,6 @@
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { api } from '@/lib/api-client';
+import { getEventById } from '@/api/events';
 import { StandardBookingView } from '@/components/booking/standard-booking-view';
 
 interface BookingPageProps {
@@ -11,7 +11,7 @@ interface BookingPageProps {
 
 export async function generateMetadata({ params }: BookingPageProps): Promise<Metadata> {
   try {
-    const event = await api.getEventById(params.id);
+    const event = await getEventById(params.id);
     return {
       title: `Select Seats & Tickets: ${event.name} | TicketHub`,
       description: `Ticket selection and booking for ${event.name} at ${event.venue?.name || 'Venue'}.`,
@@ -26,7 +26,7 @@ export async function generateMetadata({ params }: BookingPageProps): Promise<Me
 export default async function BookingPage({ params }: BookingPageProps) {
   let event;
   try {
-    event = await api.getEventById(params.id);
+    event = await getEventById(params.id);
   } catch (e) {
     notFound();
   }

@@ -19,7 +19,13 @@ import {
 import { TicketListing } from './ticket-selection-panel';
 import { EventItem, PartnerCartResponse, PartnerCommitResponse } from '@/types';
 import { formatDate, downloadIcsFile } from '@/lib/utils';
-import { api } from '@/lib/api-client';
+import {
+  createPartnerCart,
+  setPartnerDeliveryOption,
+  addPartnerPayment,
+  commitPartnerOrder,
+  deletePartnerCart,
+} from '@/api/partner';
 import { toast } from 'sonner';
 
 export interface CheckoutSeatItem {
@@ -55,6 +61,7 @@ export function CheckoutDrawer({
   const [cardNumber, setCardNumber] = useState('•••• •••• •••• 4242');
   const [isProcessing, setIsProcessing] = useState(false);
   const [partnerCart, setPartnerCart] = useState<PartnerCartResponse | null>(null);
+  const [selectedDeliveryId, setSelectedDeliveryId] = useState<string | number>('ETICKET');
   const [confirmedOrder, setConfirmedOrder] = useState<PartnerCommitResponse | null>(null);
   const [remainingSeconds, setRemainingSeconds] = useState(600);
 
@@ -84,15 +91,15 @@ export function CheckoutDrawer({
             ]
           : [];
 
-      api
-        .createPartnerCart(event.id, reserves, { customerName: fullName, customerEmail: email })
-        .then((cart) => {
+      createPartnerCart(event.id, reserves, { customerName: fullName, customerEmail: email })
+        .then((cart: PartnerCartResponse) => {
           if (isMounted) {
             setPartnerCart(cart);
+            if (cart.selectedDeliveryId) setSelectedDeliveryId(cart.selectedDeliveryId);
             setRemainingSeconds(cart.holdSeconds || 600);
           }
         })
-        .catch((err) => {
+        .catch((err: any) => {
           console.warn('Partner cart init:', err.message);
         });
     }
@@ -158,25 +165,40 @@ export function CheckoutDrawer({
                 },
               ];
 
-        activeCart = await api.createPartnerCart(event.id, reserves, {
+        activeCart = await createPartnerCart(event.id, reserves, {
           customerName: fullName,
           customerEmail: email,
         });
         setPartnerCart(activeCart);
       }
 
-      // 1. Authorize Payment via Ticketmaster Partner API
-      await api.addPartnerPayment(event.id, activeCart.cartId, {
+      // 1. Set Delivery Option via Ticketmaster Partner API
+      if (selectedDeliveryId && activeCart.selectedDeliveryId !== selectedDeliveryId) {
+        try {
+          activeCart = await setPartnerDeliveryOption(event.id, activeCart.cartId, selectedDeliveryId);
+          setPartnerCart(activeCart);
+        } catch {}
+      }
+
+      // 2. Authorize Payment via Ticketmaster Partner API
+      await addPartnerPayment(event.id, activeCart.cartId, {
         paymentType: 'credit_card',
         amount: activeCart.totals.total,
         cardBrand: 'Visa',
         cardLast4: cardNumber.replace(/\D/g, '').slice(-4) || '4242',
-      });
-
-      // 2. Commit Order & Generate Tickets via Ticketmaster Partner API
-      const order = await api.commitPartnerOrder(event.id, activeCart.cartId, {
         customerName: fullName,
         customerEmail: email,
+      });
+
+      // 3. Commit Order & Generate Tickets via Ticketmaster Partner API
+      const deliveryName =
+        activeCart.deliveryOptions?.find((d) => d.id === selectedDeliveryId)?.name ||
+        'Mobile Entry (Ticketmaster SafeTix)';
+
+      const order = await commitPartnerOrder(event.id, activeCart.cartId, {
+        customerName: fullName,
+        customerEmail: email,
+        deliveryMethod: deliveryName,
       });
 
       setConfirmedOrder(order);
@@ -204,7 +226,7 @@ export function CheckoutDrawer({
 
   const handleClose = () => {
     if (step !== 'confirmed' && partnerCart?.cartId) {
-      api.deletePartnerCart(event.id, partnerCart.cartId).catch(() => {});
+      deletePartnerCart(event.id, partnerCart.cartId).catch(() => {});
     }
     onClose();
   };
@@ -369,6 +391,49 @@ export function CheckoutDrawer({
                   </div>
                 </div>
 
+                {/* Partner API Delivery Options */}
+                {partnerCart?.deliveryOptions && partnerCart.deliveryOptions.length > 0 && (
+                  <div className="space-y-2 p-3.5 rounded-2xl border border-border bg-slate-50 dark:bg-slate-800/40">
+                    <span className="text-[11px] font-bold text-foreground block uppercase tracking-wider">
+                      Delivery Option
+                    </span>
+                    <div className="space-y-2">
+                      {partnerCart.deliveryOptions.map((opt) => (
+                        <label
+                          key={opt.id}
+                          className={`flex items-start justify-between p-2.5 rounded-xl border cursor-pointer text-xs transition-all ${
+                            selectedDeliveryId === opt.id
+                              ? 'border-primary bg-primary/5 font-semibold text-foreground shadow-sm'
+                              : 'border-border/70 hover:border-border text-muted-foreground'
+                          }`}
+                        >
+                          <div className="flex items-start gap-2.5">
+                            <input
+                              type="radio"
+                              name="partnerDeliveryMethod"
+                              checked={selectedDeliveryId === opt.id}
+                              onChange={() => setSelectedDeliveryId(opt.id)}
+                              className="mt-0.5 text-primary focus:ring-primary"
+                            />
+                            <div>
+                              <span className="block text-foreground text-xs font-bold leading-tight">{opt.name}</span>
+                              <span className="text-[10px] text-muted-foreground block mt-0.5 leading-tight">{opt.description}</span>
+                              {opt.eta && (
+                                <span className="inline-block text-[9px] font-semibold text-emerald-600 dark:text-emerald-400 mt-0.5">
+                                  ETA: {opt.eta}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <span className="text-xs font-black text-foreground shrink-0 ml-2">
+                            {opt.price === 0 ? 'FREE' : `$${opt.price.toFixed(2)}`}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <button
                   onClick={() => setStep('payment')}
                   className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-violet-600 via-purple-600 to-pink-500 text-white font-extrabold text-sm shadow-lg shadow-violet-500/25 flex items-center justify-center gap-2 hover:opacity-95 active:scale-[0.99] transition-all"
@@ -488,6 +553,11 @@ export function CheckoutDrawer({
                   <p className="text-xs text-muted-foreground mt-1">
                     Order ID: <span className="font-mono font-bold text-foreground">{confirmedOrder?.orderId || 'TM-ORD-2026-99120'}</span>
                   </p>
+                  {confirmedOrder?.orderNumber && (
+                    <p className="text-[11px] text-muted-foreground">
+                      Ticketmaster Host Order: <span className="font-mono font-bold text-foreground">{confirmedOrder.orderNumber}</span>
+                    </p>
+                  )}
                   <p className="text-[11px] text-muted-foreground">
                     Confirmation Code: <span className="font-mono font-bold text-primary">{confirmedOrder?.confirmationCode || 'TMC-88192'}</span>
                   </p>
@@ -548,6 +618,18 @@ export function CheckoutDrawer({
 
                 {/* Post Booking Actions */}
                 <div className="space-y-2">
+                  {confirmedOrder?.redemptionUrl && (
+                    <a
+                      href={confirmedOrder.redemptionUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="w-full py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition-colors"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      <span>View Official Order on Ticketmaster</span>
+                    </a>
+                  )}
+
                   <button
                     onClick={handleDownloadTicket}
                     className="w-full py-2.5 px-4 rounded-xl bg-secondary hover:bg-secondary/80 text-foreground text-xs font-bold flex items-center justify-center gap-2 border border-border"

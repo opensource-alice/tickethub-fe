@@ -11,7 +11,7 @@ import {
   ChevronLeft,
   Calendar,
 } from 'lucide-react';
-import { api } from '@/lib/api-client';
+import { getVenueById } from '@/api/venues';
 import { EventCard } from '@/components/events/event-card';
 
 interface VenuePageProps {
@@ -22,7 +22,7 @@ interface VenuePageProps {
 
 export async function generateMetadata({ params }: VenuePageProps): Promise<Metadata> {
   try {
-    const venue = await api.getVenueById(params.id);
+    const venue = await getVenueById(params.id);
     return {
       title: `${venue.name} Seating, Schedule & Info | TicketHub`,
       description: `Official venue guide for ${venue.name} in ${venue.city || 'City'}. View upcoming concerts, sporting events, accessibility, and parking.`,
@@ -37,7 +37,7 @@ export async function generateMetadata({ params }: VenuePageProps): Promise<Meta
 export default async function VenuePage({ params }: VenuePageProps) {
   let venue;
   try {
-    venue = await api.getVenueById(params.id);
+    venue = await getVenueById(params.id);
   } catch (e) {
     notFound();
   }

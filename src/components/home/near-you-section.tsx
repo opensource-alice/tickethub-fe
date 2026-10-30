@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { MapPin, Navigation, Sparkles } from 'lucide-react';
-import { api } from '@/lib/api-client';
+import { getEvents } from '@/api/events';
 import { useGeolocation } from '@/hooks/use-geolocation';
 import { EventCarousel } from '@/components/events/event-carousel';
 import { CitySelector } from '@/components/shared/city-selector';
@@ -16,7 +16,7 @@ export function NearYouSection() {
 
   const { data, isLoading } = useQuery({
     queryKey: ['events-near-you', activeCity],
-    queryFn: () => api.getEvents({ city: activeCity, size: 8 }),
+    queryFn: () => getEvents({ city: activeCity, size: 8 }),
     staleTime: 5 * 60 * 1000,
   });
 

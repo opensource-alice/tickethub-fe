@@ -157,6 +157,18 @@ export interface CartReservedItem {
   lineTotal: number;
 }
 
+export interface PartnerDeliveryOption {
+  id: string | number;
+  carrier: string;
+  serviceLevel: string;
+  name: string;
+  description: string;
+  price: number;
+  currency: string;
+  requiresAddress: boolean;
+  eta?: string;
+}
+
 export interface PartnerCartResponse {
   cartId: string;
   eventId: string;
@@ -165,6 +177,8 @@ export interface PartnerCartResponse {
   expiresAt: string;
   items: CartReservedItem[];
   totals: CartTotals;
+  deliveryOptions?: PartnerDeliveryOption[];
+  selectedDeliveryId?: string | number;
   customer?: {
     name?: string;
     email?: string;
@@ -190,6 +204,9 @@ export interface IssuedTicket {
 export interface PartnerCommitResponse {
   orderId: string;
   confirmationCode: string;
+  orderNumber?: string;
+  orderToken?: string;
+  redemptionUrl?: string;
   eventId: string;
   eventName: string;
   venueName: string;
@@ -203,6 +220,89 @@ export interface PartnerCommitResponse {
     phone?: string;
   };
   totals: CartTotals;
+  tickets: IssuedTicket[];
+}
+
+/** Official Ticketmaster Partner API Payload Schemas **/
+
+export interface PartnerReservePayload {
+  reserve: {
+    tickets?: {
+      id: string; // Maintain leading zeros (e.g. "000002040006")
+      quantity: number;
+      price?: {
+        id?: number;
+        amount?: number;
+      };
+    }[];
+    areas?: { id: string }[];
+    section?: string;
+    row?: string;
+    begin_seat?: number;
+    end_seat?: number;
+    accept_best_available?: boolean;
+  };
+  additional_reserves?: {
+    tickets: { id: string; quantity: number }[];
+    section: string;
+    row: string;
+    begin_seat?: number;
+    end_seat?: number;
+  }[];
+}
+
+export interface PartnerBillingPayload {
+  cart_id: string;
+  payment: {
+    address?: {
+      line1: string;
+      line2?: string;
+      city?: string;
+      region?: { abbrev: string };
+      postal_code: string;
+      country?: { code: string };
+    };
+    amount: string | number;
+    card?: {
+      number: string;
+      expireMonth?: number;
+      expireYear?: number;
+      Issuer?: string;
+    };
+    email_address: string;
+    first_name: string;
+    last_name: string;
+    home_phone?: string;
+    type: 'BRAINTREE' | 'CREDIT_CARD' | 'INVOICE';
+    partner_promo_amount?: string;
+    partner_promo_currency?: string;
+  };
+}
+
+export interface PartnerCommitPayload {
+  cart_id: string;
+  source_account_id?: string;
+  tracking?: {
+    sharedId?: string;
+    subId1?: string;
+    subId2?: string;
+    subId3?: string;
+  };
+}
+
+export interface PartnerOrderDetails {
+  orderId: string;
+  orderNumber: string;
+  orderToken?: string;
+  redemptionUrl?: string;
+  status: string;
+  grandTotal: number;
+  currency: string;
+  event: {
+    id: string;
+    name: string;
+    date: string;
+  };
   tickets: IssuedTicket[];
 }
 

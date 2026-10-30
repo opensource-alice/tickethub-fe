@@ -3,7 +3,8 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Calendar, MapPin, ChevronLeft, ShieldCheck } from 'lucide-react';
-import { api } from '@/lib/api-client';
+import { getEventById, getSimilarEvents } from '@/api/events';
+import { getEventImages } from '@/api/images';
 import { formatDate } from '@/lib/utils';
 import { BookingCard } from '@/components/events/booking-card';
 import { EventDetailTabs } from '@/components/events/event-detail-tabs';
@@ -16,7 +17,7 @@ interface EventPageProps {
 
 export async function generateMetadata({ params }: EventPageProps): Promise<Metadata> {
   try {
-    const event = await api.getEventById(params.id);
+    const event = await getEventById(params.id);
     const dateInfo = formatDate(event.dates.localDate, event.dates.localTime);
 
     return {
@@ -50,15 +51,15 @@ export default async function EventPage({ params }: EventPageProps) {
   let hiResImages: import('@/types').HiResImagesResponse | null = null;
 
   try {
-    event = await api.getEventById(params.id);
+    event = await getEventById(params.id);
   } catch (error) {
     notFound();
   }
 
   try {
     const [similarRes, imagesRes] = await Promise.all([
-      api.getSimilarEvents(params.id).catch(() => ({ events: [] })),
-      api.getEventImages(params.id).catch(() => null),
+      getSimilarEvents(params.id).catch(() => ({ events: [] })),
+      getEventImages(params.id).catch(() => null),
     ]);
     similarEvents = similarRes.events || [];
     hiResImages = imagesRes;

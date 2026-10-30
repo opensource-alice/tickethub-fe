@@ -3,18 +3,18 @@ import { HeroSection } from '@/components/home/hero-section';
 import { CategoryTiles } from '@/components/home/category-tiles';
 import { NearYouSection } from '@/components/home/near-you-section';
 import { EventCarousel } from '@/components/events/event-carousel';
-import { api } from '@/lib/api-client';
+import { getEvents } from '@/api/events';
 
 export const revalidate = 300; // 5 min ISR
 
 export default async function HomePage() {
   // Fetch initial event groups concurrently on server for instant SSR performance
   const [trendingData, musicData, sportsData, theatreData, familyData] = await Promise.all([
-    api.getEvents({ size: 8, sort: 'relevance,desc' }).catch(() => ({ events: [], pagination: { page: 0, size: 8, totalElements: 0, totalPages: 0 } })),
-    api.getEvents({ classificationName: 'Music', size: 8 }).catch(() => ({ events: [], pagination: { page: 0, size: 8, totalElements: 0, totalPages: 0 } })),
-    api.getEvents({ classificationName: 'Sports', size: 8 }).catch(() => ({ events: [], pagination: { page: 0, size: 8, totalElements: 0, totalPages: 0 } })),
-    api.getEvents({ classificationName: 'Arts & Theatre', size: 8 }).catch(() => ({ events: [], pagination: { page: 0, size: 8, totalElements: 0, totalPages: 0 } })),
-    api.getEvents({ classificationName: 'Misc', size: 8 }).catch(() => ({ events: [], pagination: { page: 0, size: 8, totalElements: 0, totalPages: 0 } })),
+    getEvents({ size: 8, sort: 'relevance,desc' }).catch(() => ({ events: [], pagination: { page: 0, size: 8, totalElements: 0, totalPages: 0 } })),
+    getEvents({ classificationName: 'Music', size: 8 }).catch(() => ({ events: [], pagination: { page: 0, size: 8, totalElements: 0, totalPages: 0 } })),
+    getEvents({ classificationName: 'Sports', size: 8 }).catch(() => ({ events: [], pagination: { page: 0, size: 8, totalElements: 0, totalPages: 0 } })),
+    getEvents({ classificationName: 'Arts & Theatre', size: 8 }).catch(() => ({ events: [], pagination: { page: 0, size: 8, totalElements: 0, totalPages: 0 } })),
+    getEvents({ classificationName: 'Misc', size: 8 }).catch(() => ({ events: [], pagination: { page: 0, size: 8, totalElements: 0, totalPages: 0 } })),
   ]);
 
   return (
