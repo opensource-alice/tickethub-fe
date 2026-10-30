@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TicketHub – Select Seats</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --ink:#1c1c24;--muted:#6b6b78;--border:#e3e3e8;
+  --blue:#2b4fe0;--pink:#e63a8c;--gold:#ffc83d;--sold:#8a86b4;
+  --bg:#ebebed;--font:"Helvetica Neue",Arial,sans-serif;
+}
+html,body{height:100%;overflow:hidden;font-family:var(--font);color:var(--ink);background:#fff}
+#app{display:flex;height:100vh}
+#map-panel{flex:1;position:relative;background:var(--bg);overflow:hidden;min-width:0}
+#sidebar{width:400px;flex-shrink:0;border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;background:#fff}
+#arena{width:100%;height:100%;display:block;cursor:grab}
+#arena.dragging{cursor:grabbing}
+.mctl{position:absolute;z-index:10;pointer-events:none}
+.mctl>*{pointer-events:all}
+#ctl-tl{top:12px;left:12px}
+#ctl-tr{top:12px;right:12px;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+#ctl-bl{bottom:48px;left:12px}
+#ctl-br{bottom:48px;right:12px;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+#btn-back{display:none;background:rgba(255,255,255,.96);border:1px solid var(--border);border-radius:20px;padding:6px 16px;font-size:13px;font-weight:600;color:var(--ink);cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.13)}
+#btn-back.show{display:block}
+#btn-back:hover{background:#eef2ff}
+#minimap-wrap{background:#1e1e2a;border-radius:7px;padding:5px;width:118px}
+#minimap-svg{display:block;width:108px;height:82px}
+#zoom-btns{display:flex;flex-direction:column;gap:4px}
+.zbtn{width:32px;height:32px;background:rgba(255,255,255,.96);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:17px;font-weight:700;color:var(--ink);display:flex;align-items:center;justify-content:center;box-shadow:0 1px 3px rgba(0,0,0,.1)}
+.zbtn:hover{background:#eef2ff}
+#pill-info{background:rgba(255,255,255,.96);border:1px solid var(--border);border-radius:20px;padding:6px 14px;font-size:12px;color:var(--muted);white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.1)}
+#btn-legend{background:rgba(255,255,255,.96);border:1px solid var(--border);border-radius:20px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;color:var(--ink)}
+#btn-legend:hover{background:#eef2ff}
+#legend-pop{position:absolute;bottom:90px;right:12px;background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px 18px;box-shadow:0 4px 16px rgba(0,0,0,.16);font-size:12px;z-index:20;display:none}
+#legend-pop.open{display:block}
+.li{display:flex;align-items:center;gap:9px;margin-bottom:9px}
+.li:last-child{margin-bottom:0}
+.ld{width:13px;height:13px;border-radius:3px;flex-shrink:0}
+#tip{position:fixed;background:#1c1c24;color:#fff;font-size:12px;font-family:var(--font);padding:5px 11px;border-radius:5px;pointer-events:none;display:none;z-index:200;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+#sb-top{padding:10px 14px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);flex-shrink:0}
+#qty-select{border:1px solid var(--border);border-radius:20px;padding:5px 30px 5px 12px;font-size:13px;font-family:var(--font);color:var(--ink);background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%236b6b78'/%3E%3C/svg%3E") no-repeat right 10px center;appearance:none;cursor:pointer;flex:1}
+.fpill{display:flex;align-items:center;gap:5px;border:1px solid var(--border);border-radius:20px;padding:5px 12px;font-size:13px;cursor:pointer;background:#fff;color:var(--ink)}
+.fpill svg{width:14px;height:14px}
+#price-rng{padding:10px 14px;border-bottom:1px solid var(--border);flex-shrink:0}
+.prow{display:flex;align-items:center;gap:8px;margin-top:4px}
+.pbox{border:1px solid var(--border);border-radius:4px;padding:4px 8px;font-size:12px;color:var(--ink);min-width:46px;text-align:center}
+.rwrap{flex:1;position:relative;height:20px}
+.rwrap input[type=range]{position:absolute;width:100%;height:4px;top:8px;pointer-events:none;appearance:none;background:transparent}
+.rwrap input[type=range]::-webkit-slider-thumb{appearance:none;width:16px;height:16px;border-radius:50%;background:var(--blue);cursor:pointer;pointer-events:all;border:2px solid #fff;box-shadow:0 0 0 1px var(--blue)}
+.rwrap input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:var(--blue);cursor:pointer;pointer-events:all;border:2px solid #fff}
+.rtrack{position:absolute;top:10px;left:0;right:0;height:4px;background:var(--border);border-radius:2px}
+.rfill{position:absolute;top:10px;height:4px;background:var(--blue);border-radius:2px}
+#tabs{display:flex;border-bottom:1px solid var(--border);flex-shrink:0}
+.tab{flex:1;padding:10px 0;font-size:11px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;border:none;background:none;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px}
+.tab.act{color:var(--blue);border-bottom-color:var(--blue)}
+#note{padding:8px 14px;font-size:11px;color:var(--muted);background:#fafafa;flex-shrink:0}
+#pp-row{display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:2px solid var(--blue);flex-shrink:0;font-size:12px}
+.pp-logo{font-weight:900;color:#003087;font-size:13px}
+.pp-txt{color:var(--ink);font-weight:600}
+.pp-more{color:var(--blue);text-decoration:none;font-weight:600;margin-left:auto}
+#sf-bar{display:none;align-items:center;gap:6px;padding:6px 14px;font-size:12px;background:#f0f4ff;border-bottom:1px solid var(--border);flex-shrink:0}
+#sf-bar.show{display:flex}
+#sf-clear{color:var(--blue);font-weight:600;cursor:pointer;margin-left:auto}
+#listings{flex:1;overflow-y:auto}
+.lst{display:flex;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer;gap:12px;transition:background .12s}
+.lst:hover{background:#f8f8fd}
+.lst.hl{background:#fffbeb;border-left:3px solid var(--gold)}
+.lthumb{width:46px;height:46px;border-radius:6px;flex-shrink:0;overflow:hidden;position:relative;background:linear-gradient(135deg,#24243e,#1c1c2e)}
+.lbadge{position:absolute;top:4px;left:4px;background:var(--gold);color:var(--ink);font-size:6.5px;font-weight:900;letter-spacing:.3px;padding:1px 4px;border-radius:2px}
+.lthumb-num{position:absolute;bottom:4px;right:4px;color:rgba(255,255,255,.4);font-size:9px;font-weight:700}
+.linfo{flex:1;min-width:0}
+.ltitle{font-size:13px;font-weight:700;color:var(--ink)}
+.lsub{font-size:11px;color:var(--muted);margin-top:2px}
+.lprice{font-size:15px;font-weight:700;color:var(--blue);white-space:nowrap}
+.no-lst{padding:32px 14px;text-align:center;color:var(--muted);font-size:13px}
+#qty-err{padding:4px 14px;font-size:11px;color:#c0392b;display:none;flex-shrink:0;background:#fff8f8}
+#qty-err.show{display:block}
+#sum-bar{flex-shrink:0;border-top:1px solid var(--border);padding:12px 14px;background:#fff}
+#chips{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;min-height:26px}
+.chip{display:flex;align-items:center;gap:5px;background:#f0f4ff;border:1px solid #c7d3ff;border-radius:20px;padding:3px 10px;font-size:11px;color:var(--ink)}
+.chip-x{cursor:pointer;color:var(--muted);font-size:14px;line-height:1}
+.chip-x:hover{color:var(--ink)}
+.srow{display:flex;align-items:center;justify-content:space-between;margin-top:4px}
+.scnt{font-size:12px;color:var(--muted)}
+.stot{font-size:15px;font-weight:700;color:var(--ink)}
+#btn-ckout{width:100%;margin-top:10px;padding:12px;background:var(--blue);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;transition:opacity .2s}
+#btn-ckout:disabled{opacity:.38;cursor:not-allowed}
+#btn-ckout:not(:disabled):hover{background:#1a3bc0}
+@media(max-width:860px){
+  #app{flex-direction:column}
+  #map-panel{height:60vh;flex:none}
+  #sidebar{width:100%;border-left:none;border-top:1px solid var(--border)}
+  #minimap-wrap{display:none}
+}
+</style>
+</head>
+<body>
+<div id="tip"></div>
+<div id="app">
+  <div id="map-panel">
+    <div class="mctl" id="ctl-tl">
+      <button id="btn-back" aria-label="Back to all sections">&#8249; All sections</button>
+    </div>
+    <div class="mctl" id="ctl-tr">
+      <div id="minimap-wrap">
+        <svg id="minimap-svg" viewBox="0 0 1000 760" width="108" height="82"></svg>
+      </div>
+      <div id="zoom-btns">
+        <button class="zbtn" id="btn-home" aria-label="Zoom to fit">&#8962;</button>
+        <button class="zbtn" id="btn-zin"  aria-label="Zoom in">+</button>
+        <button class="zbtn" id="btn-zout" aria-label="Zoom out">&#8722;</button>
+      </div>
+    </div>
+    <svg id="arena" viewBox="0 0 1000 760" preserveAspectRatio="xMidYMid meet">
+      <defs>
+        <pattern id="dp" x="0" y="0" width="7" height="7" patternUnits="userSpaceOnUse">
+          <circle cx="3.5" cy="3.5" r="0.9" fill="#c4c4cc"/>
+        </pattern>
+      </defs>
+      <g id="layer-floor"></g>
+      <g id="layer-secs"></g>
+      <g id="layer-seats"></g>
+    </svg>
+    <div class="mctl" id="ctl-bl">
+      <div id="pill-info">Click a section to see its seats</div>
+    </div>
+    <div class="mctl" id="ctl-br">
+      <button id="btn-legend" aria-label="Toggle legend">Legend &#9650;</button>
+    </div>
+    <div id="legend-pop">
+      <div class="li"><div class="ld" style="background:#e63a8c"></div><span>Pink &ndash; Resale ticket (under $70)</span></div>
+      <div class="li"><div class="ld" style="background:#2b4fe0"></div><span>Blue &ndash; Standard Admission ($70+)</span></div>
+      <div class="li"><div class="ld" style="background:#ffc83d"></div><span>Gold &ndash; Your selected seat</span></div>
+      <div class="li"><div class="ld" style="background:#8a86b4"></div><span>Grey &ndash; Sold out</span></div>
+    </div>
+  </div>
+  <div id="sidebar">
+    <div id="sb-top">
+      <select id="qty-select" aria-label="Ticket quantity">
+        <option value="1">1 Ticket</option>
+        <option value="2" selected>2 Tickets</option>
+        <option value="3">3 Tickets</option>
+        <option value="4">4 Tickets</option>
+        <option value="5">5 Tickets</option>
+        <option value="6">6 Tickets</option>
+        <option value="7">7 Tickets</option>
+        <option value="8">8 Tickets</option>
+      </select>
+      <button class="fpill" aria-label="Filters">
+        <svg viewBox="0 0 16 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+          <line x1="0" y1="2" x2="16" y2="2"/><line x1="3" y1="6" x2="13" y2="6"/><line x1="6" y1="10" x2="10" y2="10"/>
+        </svg>
+        Filters
+      </button>
+    </div>
+    <div id="price-rng">
+      <div class="prow">
+        <div class="pbox" id="pmin-lbl">$29</div>
+        <div class="rwrap">
+          <div class="rtrack"></div>
+          <div class="rfill" id="rfill"></div>
+          <input type="range" id="rng-lo" min="29" max="154" value="29" step="1" aria-label="Minimum price">
+          <input type="range" id="rng-hi" min="29" max="154" value="154" step="1" aria-label="Maximum price">
+        </div>
+        <div class="pbox" id="pmax-lbl">$154+</div>
+      </div>
+    </div>
+    <div id="tabs">
+      <button class="tab act" data-tab="lowest">Lowest Price</button>
+      <button class="tab" data-tab="best">Best Seats</button>
+    </div>
+    <div id="note">We're All In: Prices include fees (before taxes).</div>
+    <div id="pp-row">
+      <span class="pp-logo">PayPal</span>
+      <span class="pp-txt">Buy Now, Pay Later</span>
+      <a href="#" class="pp-more" onclick="return false">More Info</a>
+    </div>
+    <div id="sf-bar">
+      <span id="sf-label">Filtered by Sec &mdash;</span>
+      <a id="sf-clear" href="#" onclick="return false">Clear</a>
+    </div>
+    <div id="listings"></div>
+    <div id="qty-err"></div>
+    <div id="sum-bar">
+      <div id="chips"></div>
+      <div class="srow">
+        <span class="scnt" id="scnt">0 of 2 seats picked</span>
+        <span class="stot" id="stot"></span>
+      </div>
+      <button id="btn-ckout" disabled>Continue to checkout</button>
+    </div>
+  </div>
+</div>
+
+<!-- Ticketmaster Payment Modal -->
+<div id="pay-modal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,0.7);z-index:9999;align-items:center;justify-content:center;backdrop-filter:blur(4px);padding:16px;">
+  <div style="background:#fff;border-radius:16px;max-width:460px;width:100%;box-shadow:0 20px 40px rgba(0,0,0,0.25);overflow:hidden;border:1px solid #e2e8f0;font-family:var(--font);">
+    <div style="background:#0f172a;color:#fff;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="background:#2b4fe0;color:#fff;font-weight:900;font-size:11px;padding:2px 6px;border-radius:4px;letter-spacing:0.5px;">TICKETMASTER</span>
+        <span style="font-weight:700;font-size:14px;">Secure Checkout</span>
+      </div>
+      <button id="pay-modal-close" style="background:none;border:none;color:#94a3b8;font-size:22px;cursor:pointer;line-height:1;">&times;</button>
+    </div>
+    <div style="padding:20px;">
+      <div style="border-bottom:1px solid #e2e8f0;padding-bottom:12px;margin-bottom:14px;">
+        <div style="font-weight:800;font-size:15px;color:#0f172a;">Welcome to the Universe! Tour</div>
+        <div style="font-size:12px;color:#64748b;margin-top:2px;">Arena Seating • Official Mobile Passes</div>
+      </div>
+      <div style="font-size:12px;font-weight:700;color:#334155;margin-bottom:8px;">Selected Ticket Checkboxes:</div>
+      <div id="pay-seats-list" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px;margin-bottom:14px;max-height:120px;overflow-y:auto;font-size:12px;display:flex;flex-direction:column;gap:6px;"></div>
+      
+      <div style="border-top:1px solid #e2e8f0;padding-top:10px;margin-bottom:14px;font-size:13px;">
+        <div style="display:flex;justify-content:space-between;color:#64748b;margin-bottom:4px;">
+          <span>Tickets Subtotal</span>
+          <span id="pay-subtotal" style="font-weight:600;color:#0f172a;">$0.00</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;color:#64748b;margin-bottom:4px;">
+          <span>Processing & Facility Fees</span>
+          <span id="pay-fees" style="font-weight:600;color:#0f172a;">$9.00</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:16px;font-weight:800;color:#0f172a;border-top:1px dashed #cbd5e1;padding-top:8px;margin-top:6px;">
+          <span>Total Payment</span>
+          <span id="pay-total" style="color:#2b4fe0;">$0.00</span>
+        </div>
+      </div>
+
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px;margin-bottom:16px;display:flex;align-items:center;gap:10px;">
+        <div style="width:28px;height:28px;border-radius:6px;background:#10b981;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:14px;shrink:0;">✓</div>
+        <div style="font-size:11px;color:#166534;">
+          <div style="font-weight:700;">Ticketmaster Partner Guarantee</div>
+          <div>Valid tickets directly to your device with 100% buyer protection.</div>
+        </div>
+      </div>
+
+      <button id="pay-confirm-btn" style="width:100%;padding:14px;background:#2b4fe0;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 12px rgba(43,79,224,0.3);">
+        <span id="pay-btn-text">Authorize Payment & Book Seats</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Success Banner Toast -->
+<div id="pay-toast" style="display:none;position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#0f172a;color:#fff;padding:14px 22px;border-radius:12px;box-shadow:0 12px 28px rgba(0,0,0,0.3);z-index:10000;font-size:13px;font-weight:600;align-items:center;gap:10px;border:1px solid #334155;">
+  <span style="font-size:18px;">🎉</span>
+  <span id="pay-toast-text">Payment Confirmed! Your tickets have been booked and the selected checkboxes are now disabled.</span>
+</div>
+
+<script>
+'use strict';
+const CX=500,CY=380,A=470,B=345,TAU=Math.PI*2;
+function sgn(v){return v>=0?1:-1}
+function P(a,r){
+  var c=Math.cos(a),s=Math.sin(a);
+  return{x:CX+A*r*sgn(c)*Math.pow(Math.abs(c),2/3),y:CY+B*r*sgn(s)*Math.pow(Math.abs(s),2/3)};
+}
+function segPath(a0,a1,r0,r1,n){
+  n=n||24;var d='';
+  for(var i=0;i<=n;i++){var p=P(a0+(a1-a0)*i/n,r1);d+=(i?'L':'M')+p.x.toFixed(1)+','+p.y.toFixed(1)+' ';}
+  for(var i=n;i>=0;i--){var p=P(a0+(a1-a0)*i/n,r0);d+='L'+p.x.toFixed(1)+','+p.y.toFixed(1)+' ';}
+  return d+'Z';
+}
+function innerPath(r,n){
+  n=n||60;var d='';
+  for(var i=0;i<=n;i++){var p=P(i/n*TAU,r);d+=(i?'L':'M')+p.x.toFixed(1)+','+p.y.toFixed(1)+' ';}
+  return d+'Z';
+}
+function rnd(s){return(Math.abs(Math.sin(s*9301+49297)*233280))%1;}
+function svgE(tag,attrs,par){
+  var el=document.createElementNS('http://www.w3.org/2000/svg',tag);
+  for(var k in attrs)el.setAttribute(k,attrs[k]);
+  if(par)par.appendChild(el);
+  return el;
+}
+
+/* SECTION DATA */
+function buildSecs(){
+  var out=[],NC=20,NU=24;
+  for(var i=0;i<NC;i++){
+    var a0=(i/NC)*TAU-Math.PI/2,a1=((i+1)/NC)*TAU-Math.PI/2,mid=(a0+a1)/2;
+    var prox=(Math.cos(mid)+1)/2;
+    // Section 212 at bottom-left angle (i = 12) matching Ticketmaster arena map
+    var num = (i === 12) ? 212 : (102 + i * 2);
+    out.push({num:num,ring:'lower',r0:.6,r1:.8,a0:a0,a1:a1,mid:mid,price:num===212 ? 45 : Math.round(50+80*prox)});
+  }
+  for(var i=0;i<NU;i++){
+    var num=202+i*2,a0=(i/NU)*TAU-Math.PI/2,a1=((i+1)/NU)*TAU-Math.PI/2,mid=(a0+a1)/2;
+    var prox=(Math.cos(mid)+1)/2;
+    out.push({num:num,ring:'upper',r0:.83,r1:1,a0:a0,a1:a1,mid:mid,price:Math.round(30+50*prox)});
+  }
+  return out;
+}
+var SECS=buildSecs();
+
+/* LISTINGS */
+var ALL_LST=(function(){
+  var out=[];
+  // Add Section 212 Row 8 listing at the top matching user screenshot
+  out.push({
+    id: '212-feat-1',
+    secNum: 212,
+    ring: 'lower',
+    row: 8,
+    price: 45.00,
+    type: 'Standard Admission',
+    prox: 0.6,
+    basePrice: 45.00
+  });
+
+  for(var si=0;si<SECS.length;si++){
+    var s=SECS[si];
+    if(s.num===212) continue;
+    for(var i=0;i<3;i++){
+      var v=rnd(s.num*11+i*7)*18,price=parseFloat((s.price+v).toFixed(2));
+      var row=Math.floor(rnd(s.num*100+i*13)*18)+1;
+      var resale=rnd(s.num*100+i+50)>.5;
+      var prox=(Math.cos(s.mid)+1)/2;
+      out.push({id:s.num+'-'+i,secNum:s.num,ring:s.ring,row:row,price:price,
+        type:resale?'Verified Resale Ticket':'Standard Admission',prox:prox,basePrice:s.price});
+    }
+  }
+  return out;
+})();
+
+/* STATE */
+var st={
+  openSec:null,
+  selected:[],
+  hlRow:null,
+  qty:2,
+  prMin:29,
+  prMax:154,
+  tab:'lowest',
+  bookedSeats:(function(){
+    try{
+      return JSON.parse(localStorage.getItem('booked_seats_seatpicker')||'[]');
+    }catch(e){return[];}
+  })()
+};
+
+/* VIEWBOX */
+var arena=document.getElementById('arena');
+var vb={x:0,y:0,w:1000,h:760},vbRaf=null;
+function setVB(x,y,w,h,anim){
+  if(anim===undefined)anim=true;
+  var tgt={x:x,y:y,w:w,h:h};
+  if(!anim){vb=Object.assign({},tgt);applyVB();return;}
+  if(vbRaf)cancelAnimationFrame(vbRaf);
+  var s0=Object.assign({},vb),t0=performance.now();
+  function step(t){
+    var p=Math.min((t-t0)/600,1),e=1-Math.pow(1-p,3);
+    vb.x=s0.x+(tgt.x-s0.x)*e;vb.y=s0.y+(tgt.y-s0.y)*e;
+    vb.w=s0.w+(tgt.w-s0.w)*e;vb.h=s0.h+(tgt.h-s0.h)*e;
+    applyVB();
+    if(p<1)vbRaf=requestAnimationFrame(step);else{vb=Object.assign({},tgt);applyVB();}
+  }
+  vbRaf=requestAnimationFrame(step);
+}
+function applyVB(){
+  arena.setAttribute('viewBox',vb.x.toFixed(1)+' '+vb.y.toFixed(1)+' '+vb.w.toFixed(1)+' '+vb.h.toFixed(1));
+  updateMM();
+}
+
+/* MINIMAP */
+var mmSvg=document.getElementById('minimap-svg');
+function buildMM(){
+  while(mmSvg.firstChild)mmSvg.removeChild(mmSvg.firstChild);
+  svgE('rect',{x:0,y:0,width:1000,height:760,fill:'#1e1e2a'},mmSvg);
+  for(var i=0;i<SECS.length;i++){
+    var s=SECS[i];
+    svgE('path',{d:segPath(s.a0,s.a1,s.r0,s.r1,10),fill:s.ring==='lower'?'#45455a':'#35354a',stroke:'#2a2a3a','stroke-width':'2'},mmSvg);
+  }
+  svgE('path',{d:innerPath(.57,40),fill:'#2a2a3a',stroke:'none'},mmSvg);
+  svgE('rect',{id:'mm-vp',x:0,y:0,width:1000,height:760,fill:'rgba(255,255,255,0.08)',stroke:'#fff','stroke-width':'12'},mmSvg);
+}
+function updateMM(){
+  var r=mmSvg.querySelector('#mm-vp');
+  if(!r)return;
+  r.setAttribute('x',vb.x);r.setAttribute('y',vb.y);
+  r.setAttribute('width',Math.min(vb.w,2000));r.setAttribute('height',Math.min(vb.h,1600));
+}
+
+/* FLOOR */
+function drawFloor(){
+  var fl=document.getElementById('layer-floor');
+  fl.innerHTML='';
+  svgE('path',{d:innerPath(.57,50),fill:'#f2f2f5',stroke:'#dcdce0','stroke-width':'1'},fl);
+  var stagePath='M665,285 L755,285 L755,480 L665,480 L665,415 L625,415 L625,355 L665,355 Z';
+  svgE('path',{d:stagePath,fill:'#1c1c24',stroke:'#111','stroke-width':'1'},fl);
+  var st1=svgE('text',{x:'710',y:'383',fill:'#fff','font-size':'16','font-weight':'900','text-anchor':'middle','dominant-baseline':'middle','letter-spacing':'2','pointer-events':'none',transform:'rotate(-90,710,383)'},fl);
+  st1.textContent='STAGE';
+  svgE('rect',{x:'395',y:'310',width:'120',height:'135',rx:'4',fill:'#2b4fe0'},fl);
+  var pit=svgE('text',{x:'455',y:'378',fill:'#fff','font-size':'18','font-weight':'900','text-anchor':'middle','dominant-baseline':'middle','pointer-events':'none'},fl);
+  pit.textContent='PIT';
+  svgE('rect',{x:'315',y:'370',width:'62',height:'26',rx:'3',fill:'#d0d0d8',stroke:'#bcbcc8','stroke-width':'1'},fl);
+  var mix=svgE('text',{x:'346',y:'383',fill:'#5a5a6a','font-size':'10','font-weight':'700','text-anchor':'middle','dominant-baseline':'middle','pointer-events':'none'},fl);
+  mix.textContent='MIX';
+  var blks=[[255,305,42,42],[255,420,42,42],[560,305,42,42],[560,420,42,42],[400,225,70,26],[400,480,70,26]];
+  for(var b=0;b<blks.length;b++){
+    svgE('rect',{x:blks[b][0],y:blks[b][1],width:blks[b][2],height:blks[b][3],rx:'2',fill:'url(#dp)',stroke:'#d0d0d8','stroke-width':'1'},fl);
+  }
+}
+
+/* SECTIONS */
+function drawSections(){
+  var lay=document.getElementById('layer-secs');
+  lay.innerHTML='';
+  for(var si=0;si<SECS.length;si++){
+    (function(sec){
+      var g=svgE('g',{id:'sec'+sec.num,'data-num':sec.num,style:'cursor:pointer'},lay);
+      var path=segPath(sec.a0,sec.a1,sec.r0,sec.r1);
+      var bp=svgE('path',{d:path,fill:sec.ring==='lower'?'#fff':'#f1f1f5',stroke:'#c0c0cc','stroke-width':'1','class':'sp'},g);
+      svgE('path',{d:path,fill:'url(#dp)',stroke:'none','pointer-events':'none'},g);
+      var col=sec.price<70?'#e63a8c':'#2b4fe0';
+      for(var i=0;i<7;i++){
+        var ra=rnd(sec.num*100+i*3),rb=rnd(sec.num*100+i*3+1);
+        var ap=sec.a0+(sec.a1-sec.a0)*(.12+ra*.76),rp=sec.r0+(sec.r1-sec.r0)*(.12+rb*.76);
+        var pt=P(ap,rp);
+        svgE('circle',{cx:pt.x.toFixed(1),cy:pt.y.toFixed(1),r:'3.2',fill:col,'pointer-events':'none'},g);
+      }
+      var lp=P((sec.a0+sec.a1)/2,(sec.r0+sec.r1)/2);
+      var lbl=svgE('text',{x:lp.x.toFixed(1),y:lp.y.toFixed(1),'text-anchor':'middle','dominant-baseline':'middle','font-size':'11','font-weight':'700',fill:'#6b6b78','pointer-events':'none'},g);
+      lbl.textContent=sec.num;
+      g.addEventListener('mouseenter',function(){
+        if(st.openSec&&st.openSec.num!==sec.num)return;
+        bp.setAttribute('stroke','#2b4fe0');bp.setAttribute('stroke-width','2');
+      });
+      g.addEventListener('mouseleave',function(){
+        bp.setAttribute('stroke','#c0c0cc');bp.setAttribute('stroke-width','1');
+      });
+      g.addEventListener('click',function(e){
+        if(dragMoved)return;
+        e.stopPropagation();
+        openSec(sec,null);
+      });
+    })(SECS[si]);
+  }
+}
+
+/* SECTION BOUNDS + ZOOM */
+function secBounds(sec){
+  var pts=[],pad=55;
+  for(var i=0;i<=30;i++){var a=sec.a0+(sec.a1-sec.a0)*i/30;pts.push(P(a,sec.r0));pts.push(P(a,sec.r1));}
+  var xs=pts.map(function(p){return p.x;}),ys=pts.map(function(p){return p.y;});
+  return{x:Math.min.apply(0,xs)-pad,y:Math.min.apply(0,ys)-pad,w:Math.max.apply(0,xs)-Math.min.apply(0,xs)+pad*2,h:Math.max.apply(0,ys)-Math.min.apply(0,ys)+pad*2};
+}
+function zoomToSec(sec){
+  var b=secBounds(sec),mp=document.getElementById('map-panel');
+  var ar=mp.clientWidth/mp.clientHeight,x=b.x,y=b.y,w=b.w,h=b.h;
+  if(w/h>ar){var nh=w/ar;y-=(nh-h)/2;h=nh;}else{var nw=h*ar;x-=(nw-w)/2;w=nw;}
+  setVB(x,y,w,h);
+}
+
+/* DRAW SEATS */
+function drawSeats(sec){
+  var lay=document.getElementById('layer-seats');
+  lay.innerHTML='';
+  var N=sec.num,arcLen=sec.a1-sec.a0,radLen=sec.r1-sec.r0;
+  var arcSize=arcLen*(sec.r0+sec.r1)/2;
+  var R=Math.max(2,Math.round(Math.sqrt(N*radLen/arcSize)));
+  var C=Math.ceil(N/R);
+  var mA=(sec.a0+sec.a1)/2,mR=(sec.r0+sec.r1)/2;
+  var p0=P(mA,mR),p1=P(mA+arcLen/C,mR),p2=P(mA,mR+radLen/R);
+  var angSp=Math.sqrt((p1.x-p0.x)*(p1.x-p0.x)+(p1.y-p0.y)*(p1.y-p0.y));
+  var radSp=Math.sqrt((p2.x-p0.x)*(p2.x-p0.x)+(p2.y-p0.y)*(p2.y-p0.y));
+  var sz=Math.min(angSp,radSp)*.68,half=sz/2,rx=sz*.22;
+  var sIdx=0;
+  for(var row=0;row<R;row++){
+    var radius=sec.r0+radLen*(row+.5)/R;
+    var seatsInRow=(row<R-1)?C:N-(R-1)*C;
+    for(var col=0;col<seatsInRow;col++){
+      sIdx++;
+      var angle=sec.a0+arcLen*(col+.5)/C;
+      var pos=P(angle,radius);
+      var seatKey = sec.num + '-' + (row + 1) + '-' + (col + 1);
+      var isBooked = st.bookedSeats && st.bookedSeats.indexOf(seatKey) >= 0;
+      var sold = isBooked || (rnd(sec.num*1000+sIdx)<.08);
+      var sPrice=parseFloat((sec.price+rnd(sec.num*100+sIdx)*20).toFixed(2));
+      var selIdx=-1;
+      for(var si=0;si<st.selected.length;si++){
+        if(st.selected[si].secNum===sec.num&&st.selected[si].row===row+1&&st.selected[si].seat===col+1){selIdx=si;break;}
+      }
+      var isSel=selIdx>=0;
+      var hlRow=st.hlRow&&st.hlRow.secNum===sec.num&&st.hlRow.row===row+1;
+      var fill=isSel?'#10b981':(sold?'#94a3b8':'#2b4fe0');
+      var stroke=isSel?'#059669':(sold?'#64748b':'#1a3bc0');
+      var strokeW='0.8';
+      if(hlRow&&!isSel&&!sold){stroke='#ffc83d';strokeW='2';}
+      var g=svgE('g',{transform:'translate('+pos.x.toFixed(1)+','+pos.y.toFixed(1)+')'},lay);
+      svgE('rect',{x:-half,y:-half,width:sz,height:sz,rx:rx,fill:fill,stroke:stroke,'stroke-width':strokeW,style:sold?'cursor:not-allowed':'cursor:pointer'},g);
+      if(sold){
+        var xs=half*.55;
+        svgE('line',{x1:-xs,y1:-xs,x2:xs,y2:xs,stroke:'#fff','stroke-width':'1.4','stroke-linecap':'round'},g);
+        svgE('line',{x1:xs,y1:-xs,x2:-xs,y2:xs,stroke:'#fff','stroke-width':'1.4','stroke-linecap':'round'},g);
+      }else if(isSel){
+        var cs=half*.52;
+        svgE('polyline',{points:(-cs)+',-0.5 '+(-cs*.1)+','+cs+' '+cs+','+(-cs*.8),fill:'none',stroke:'#ffffff','stroke-width':'1.5','stroke-linecap':'round','stroke-linejoin':'round'},g);
+      }
+      if(!sold){
+        (function(r1,c1,sp,sg){
+          var label='Row '+r1+', Seat '+c1+': $'+sp.toFixed(2);
+          sg.addEventListener('mouseenter',function(e){showTip(label,e.clientX,e.clientY);});
+          sg.addEventListener('mousemove',function(e){showTip(label,e.clientX,e.clientY);});
+          sg.addEventListener('mouseleave',hideTip);
+          sg.addEventListener('click',function(e){
+            e.stopPropagation();hideTip();
+            toggleSeat({secNum:sec.num,row:r1,seat:c1,price:sp},sec);
+          });
+        })(row+1,col+1,sPrice,g);
+      }
+    }
+  }
+}
+
+/* OPEN/CLOSE SECTION */
+function openSec(sec,hlRow){
+  st.openSec=sec;st.hlRow=hlRow||null;
+  for(var i=0;i<SECS.length;i++){
+    var g=document.getElementById('sec'+SECS[i].num);
+    if(g)g.setAttribute('opacity',SECS[i].num===sec.num?'1':'.22');
+  }
+  zoomToSec(sec);
+  setTimeout(function(){drawSeats(sec);},660);
+  document.getElementById('btn-back').classList.add('show');
+  document.getElementById('pill-info').textContent='Section '+sec.num+' \u00B7 '+sec.num+' seats';
+  var sfBar=document.getElementById('sf-bar');
+  sfBar.classList.add('show');
+  document.getElementById('sf-label').textContent='Filtered by Sec '+sec.num;
+  renderListings();
+}
+function closeSec(){
+  st.openSec=null;st.hlRow=null;
+  for(var i=0;i<SECS.length;i++){
+    var g=document.getElementById('sec'+SECS[i].num);
+    if(g)g.setAttribute('opacity','1');
+  }
+  document.getElementById('layer-seats').innerHTML='';
+  setVB(0,0,1000,760);
+  document.getElementById('btn-back').classList.remove('show');
+  document.getElementById('pill-info').textContent='Click a section to see its seats';
+  document.getElementById('sf-bar').classList.remove('show');
+  renderListings();
+}
+
+/* SEAT TOGGLE */
+function toggleSeat(seat,sec){
+  var idx=-1;
+  for(var i=0;i<st.selected.length;i++){
+    if(st.selected[i].secNum===seat.secNum&&st.selected[i].row===seat.row&&st.selected[i].seat===seat.seat){idx=i;break;}
+  }
+  if(idx>=0){
+    st.selected.splice(idx,1);
+  }else{
+    if(st.selected.length>=st.qty){
+      var err=document.getElementById('qty-err');
+      err.textContent='You can only select up to '+st.qty+' seat'+(st.qty>1?'s':'')+'.';
+      err.classList.add('show');
+      setTimeout(function(){err.classList.remove('show');},2800);
+      return;
+    }
+    st.selected.push(seat);
+  }
+  drawSeats(sec);renderChips();updateSummary();
+}
+
+/* LISTINGS */
+function filteredLst(){
+  var lst=ALL_LST.filter(function(l){return l.price>=st.prMin&&l.price<=st.prMax;});
+  if(st.openSec)lst=lst.filter(function(l){return l.secNum===st.openSec.num;});
+  if(st.tab==='lowest')lst.sort(function(a,b){return a.price-b.price;});
+  else lst.sort(function(a,b){
+    var as=b.prox*(b.ring==='lower'?2:1),bs=a.prox*(a.ring==='lower'?2:1);
+    return as-bs;
+  });
+  return lst;
+}
+function renderListings(){
+  var cont=document.getElementById('listings');
+  cont.innerHTML='';
+  var lst=filteredLst();
+  if(!lst.length){cont.innerHTML='<div class="no-lst">No tickets match your price filter.</div>';return;}
+  lst.forEach(function(l,i){
+    var feat=i<3&&l.type==='Standard Admission';
+    var div=document.createElement('div');
+    div.className='lst';
+    if(st.hlRow&&st.hlRow.secNum===l.secNum&&st.hlRow.row===l.row)div.classList.add('hl');
+    div.innerHTML='<div class="lthumb">'+(feat?'<div class="lbadge">FEATURED</div>':'')+'<div class="lthumb-num">'+l.secNum+'</div></div><div class="linfo"><div class="ltitle">Sec '+l.secNum+' &middot; Row '+l.row+'</div><div class="lsub">'+l.type+'</div></div><div class="lprice">$'+l.price.toFixed(2)+'</div>';
+    (function(ll){
+      div.addEventListener('click',function(){
+        var sec=null;
+        for(var i=0;i<SECS.length;i++){if(SECS[i].num===ll.secNum){sec=SECS[i];break;}}
+        if(sec)openSec(sec,{secNum:ll.secNum,row:ll.row});
+      });
+    })(l);
+    cont.appendChild(div);
+  });
+}
+
+/* CHIPS + SUMMARY */
+function renderChips(){
+  var cont=document.getElementById('chips');
+  cont.innerHTML='';
+  st.selected.forEach(function(s,i){
+    var chip=document.createElement('div');
+    chip.className='chip';
+    chip.innerHTML='Sec '+s.secNum+' &middot; Row '+s.row+' &middot; Seat '+s.seat+' <span class="chip-x" title="Remove">&times;</span>';
+    (function(idx){
+      chip.querySelector('.chip-x').addEventListener('click',function(){
+        st.selected.splice(idx,1);
+        renderChips();updateSummary();
+        if(st.openSec)drawSeats(st.openSec);
+      });
+    })(i);
+    cont.appendChild(chip);
+  });
+}
+function updateSummary(){
+  var n=st.selected.length,q=st.qty;
+  document.getElementById('scnt').textContent=n+' of '+q+' seat'+(q>1?'s':'')+' picked';
+  var tot=st.selected.reduce(function(a,s){return a+s.price;},0);
+  document.getElementById('stot').textContent=n>0?('$'+tot.toFixed(2)):'';
+  document.getElementById('btn-ckout').disabled=(n!==q);
+}
+
+/* TOOLTIP */
+var tipEl=document.getElementById('tip');
+function showTip(txt,cx,cy){tipEl.textContent=txt;tipEl.style.display='block';tipEl.style.left=(cx+12)+'px';tipEl.style.top=(cy-34)+'px';}
+function hideTip(){tipEl.style.display='none';}
+
+/* PAN + WHEEL */
+var isDrag=false,dragMoved=false,ds={x:0,y:0,vx:0,vy:0};
+arena.addEventListener('mousedown',function(e){
+  if(e.button!==0)return;
+  isDrag=true;dragMoved=false;ds={x:e.clientX,y:e.clientY,vx:vb.x,vy:vb.y};
+  arena.classList.add('dragging');
+});
+document.addEventListener('mousemove',function(e){
+  if(!isDrag)return;
+  var dx=e.clientX-ds.x,dy=e.clientY-ds.y;
+  if(Math.abs(dx)>4||Math.abs(dy)>4)dragMoved=true;
+  if(!dragMoved)return;
+  var rect=arena.getBoundingClientRect();
+  vb.x=ds.vx-dx*(vb.w/rect.width);vb.y=ds.vy-dy*(vb.h/rect.height);applyVB();
+});
+document.addEventListener('mouseup',function(){isDrag=false;arena.classList.remove('dragging');});
+arena.addEventListener('wheel',function(e){
+  e.preventDefault();
+  var rect=arena.getBoundingClientRect();
+  var mx=(e.clientX-rect.left)/rect.width*vb.w+vb.x,my=(e.clientY-rect.top)/rect.height*vb.h+vb.y;
+  var f=e.deltaY>0?1.15:1/1.15;
+  var nw=Math.min(vb.w*f,2000),nh=Math.min(vb.h*f,1600);
+  setVB(mx-(mx-vb.x)*f,my-(my-vb.y)*f,nw,nh,false);
+},{passive:false});
+var lastTD=0;
+arena.addEventListener('touchstart',function(e){
+  if(e.touches.length===1){isDrag=true;dragMoved=false;var t=e.touches[0];ds={x:t.clientX,y:t.clientY,vx:vb.x,vy:vb.y};}
+  else if(e.touches.length===2){isDrag=false;var dx=e.touches[0].clientX-e.touches[1].clientX,dy=e.touches[0].clientY-e.touches[1].clientY;lastTD=Math.sqrt(dx*dx+dy*dy);}
+},{passive:true});
+arena.addEventListener('touchmove',function(e){
+  e.preventDefault();
+  if(e.touches.length===1&&isDrag){
+    var t=e.touches[0],dx=t.clientX-ds.x,dy=t.clientY-ds.y;
+    if(Math.abs(dx)>4||Math.abs(dy)>4)dragMoved=true;
+    if(!dragMoved)return;
+    var rect=arena.getBoundingClientRect();
+    vb.x=ds.vx-dx*(vb.w/rect.width);vb.y=ds.vy-dy*(vb.h/rect.height);applyVB();
+  }else if(e.touches.length===2&&lastTD>0){
+    var dx=e.touches[0].clientX-e.touches[1].clientX,dy=e.touches[0].clientY-e.touches[1].clientY,d=Math.sqrt(dx*dx+dy*dy);
+    var f=lastTD/d,cx=(e.touches[0].clientX+e.touches[1].clientX)/2,cy=(e.touches[0].clientY+e.touches[1].clientY)/2;
+    var rect=arena.getBoundingClientRect();
+    var mx=(cx-rect.left)/rect.width*vb.w+vb.x,my=(cy-rect.top)/rect.height*vb.h+vb.y;
+    setVB(mx-(mx-vb.x)*f,my-(my-vb.y)*f,Math.min(vb.w*f,2000),Math.min(vb.h*f,1600),false);
+    lastTD=d;
+  }
+},{passive:false});
+arena.addEventListener('touchend',function(){isDrag=false;lastTD=0;});
+
+/* ZOOM BUTTONS */
+document.getElementById('btn-home').addEventListener('click',closeSec);
+document.getElementById('btn-zin').addEventListener('click',function(){
+  var cx=vb.x+vb.w/2,cy=vb.y+vb.h/2,nw=vb.w/1.4,nh=vb.h/1.4;
+  setVB(cx-nw/2,cy-nh/2,nw,nh);
+});
+document.getElementById('btn-zout').addEventListener('click',function(){
+  var cx=vb.x+vb.w/2,cy=vb.y+vb.h/2,nw=Math.min(vb.w*1.4,2000),nh=Math.min(vb.h*1.4,1600);
+  setVB(cx-nw/2,cy-nh/2,nw,nh);
+});
+
+/* BACK + CLEAR */
+document.getElementById('btn-back').addEventListener('click',closeSec);
+document.getElementById('sf-clear').addEventListener('click',closeSec);
+
+/* LEGEND */
+var legPop=document.getElementById('legend-pop');
+document.getElementById('btn-legend').addEventListener('click',function(){legPop.classList.toggle('open');});
+document.addEventListener('click',function(e){if(!legPop.contains(e.target)&&e.target!==document.getElementById('btn-legend'))legPop.classList.remove('open');});
+
+/* TABS */
+document.querySelectorAll('.tab').forEach(function(t){
+  t.addEventListener('click',function(){
+    document.querySelectorAll('.tab').forEach(function(x){x.classList.remove('act');});
+    t.classList.add('act');st.tab=t.dataset.tab;renderListings();
+  });
+});
+
+/* QUANTITY */
+document.getElementById('qty-select').addEventListener('change',function(){
+  st.qty=parseInt(this.value);
+  if(st.selected.length>st.qty){st.selected.splice(st.qty);renderChips();if(st.openSec)drawSeats(st.openSec);}
+  updateSummary();
+});
+
+/* PRICE RANGE */
+var rngLo=document.getElementById('rng-lo'),rngHi=document.getElementById('rng-hi'),rfill=document.getElementById('rfill');
+function updateRange(){
+  var lo=parseInt(rngLo.value),hi=parseInt(rngHi.value);
+  if(lo>hi){var t=lo;lo=hi;hi=t;}
+  st.prMin=lo;st.prMax=hi;
+  document.getElementById('pmin-lbl').textContent='$'+lo;
+  document.getElementById('pmax-lbl').textContent=hi>=154?'$154+':'$'+hi;
+  var pct=function(v){return(v-29)/(154-29)*100;};
+  rfill.style.left=pct(lo)+'%';rfill.style.width=(pct(hi)-pct(lo))+'%';
+  renderListings();
+}
+rngLo.addEventListener('input',updateRange);rngHi.addEventListener('input',updateRange);updateRange();
+
+/* CHECKOUT MODAL LOGIC */
+var payModal=document.getElementById('pay-modal');
+var payModalClose=document.getElementById('pay-modal-close');
+var payConfirmBtn=document.getElementById('pay-confirm-btn');
+var payToast=document.getElementById('pay-toast');
+
+function showPayModal(){
+  if(st.selected.length===0) return;
+  var listEl=document.getElementById('pay-seats-list');
+  listEl.innerHTML='';
+  var subtotal=0;
+  for(var i=0;i<st.selected.length;i++){
+    var s=st.selected[i];
+    subtotal+=s.price;
+    var row=document.createElement('div');
+    row.style.display='flex';
+    row.style.justifyContent='space-between';
+    row.style.alignItems='center';
+    row.style.padding='4px 0';
+    row.innerHTML='<span style="font-weight:600;color:#1e293b;">Sec '+s.secNum+' · Row '+s.row+' · Seat '+s.seat+'</span><span style="font-weight:700;color:#2b4fe0;">$'+s.price.toFixed(2)+'</span>';
+    listEl.appendChild(row);
+  }
+  var fees=st.selected.length*4.5;
+  var total=subtotal+fees;
+  document.getElementById('pay-subtotal').textContent='$'+subtotal.toFixed(2);
+  document.getElementById('pay-fees').textContent='$'+fees.toFixed(2);
+  document.getElementById('pay-total').textContent='$'+total.toFixed(2);
+  document.getElementById('pay-btn-text').textContent='Pay $'+total.toFixed(2)+' & Confirm Seats';
+  payModal.style.display='flex';
+}
+
+function hidePayModal(){
+  payModal.style.display='none';
+}
+
+payModalClose.addEventListener('click',hidePayModal);
+payModal.addEventListener('click',function(e){if(e.target===payModal)hidePayModal();});
+
+document.getElementById('btn-ckout').addEventListener('click',showPayModal);
+
+payConfirmBtn.addEventListener('click',function(){
+  payConfirmBtn.disabled=true;
+  document.getElementById('pay-btn-text').textContent='Authorizing Visa ···· 4242...';
+  
+  setTimeout(function(){
+    // Authorize & Add Selected Seats to bookedSeats (Disabled)
+    for(var si=0;si<st.selected.length;si++){
+      var s=st.selected[si];
+      var k=s.secNum+'-'+s.row+'-'+s.seat;
+      if(st.bookedSeats.indexOf(k)===-1){
+        st.bookedSeats.push(k);
+      }
+    }
+    try{
+      localStorage.setItem('booked_seats_seatpicker',JSON.stringify(st.bookedSeats));
+    }catch(e){}
+
+    var count=st.selected.length;
+    st.selected=[];
+    hidePayModal();
+    payConfirmBtn.disabled=false;
+
+    // Redraw seats to immediately show as disabled (grey with 'x')
+    if(st.openSec){
+      drawSeats(st.openSec);
+    }
+    updateSummary();
+
+    // Show toast
+    payToast.style.display='flex';
+    document.getElementById('pay-toast-text').textContent='Payment Confirmed! '+count+' ticket(s) booked. Selected checkboxes are now disabled.';
+    setTimeout(function(){payToast.style.display='none';},4500);
+  }, 400);
+});
+
+/* INIT */
+buildMM();drawFloor();drawSections();renderListings();updateSummary();
+</script>
+</body>
+</html>
